@@ -3,7 +3,8 @@ import { motion } from 'framer-motion';
 import axios from 'axios';
 import { useSearchParams } from 'react-router-dom';
 
-const API = 'http://localhost:5000/api/games';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API = `${API_BASE_URL}/api/games`;
 const CARD_VALUES = ['🌙', '⭐', '☁️', '🌿', '🫧', '🧘', '🎵', '🕯️'];
 
 const shuffle = (arr) => [...arr].sort(() => Math.random() - 0.5);

@@ -3,6 +3,8 @@ import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
 const JournalSection = () => {
     const [title, setTitle] = useState('');
     const [content, setContent] = useState('');
@@ -13,7 +15,7 @@ const JournalSection = () => {
         e.preventDefault();
         try {
             await axios.post(
-                'http://localhost:5000/api/journal',
+                `${API_BASE_URL}/api/journal`,
                 { title, content, mood },
                 { headers: { Authorization: `Bearer ${token}` } },
             );

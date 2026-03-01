@@ -3,13 +3,15 @@ import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
 const JournalHistory = () => {
     const [entries, setEntries] = useState([]);
     const token = localStorage.getItem('token');
 
     const fetchEntries = async () => {
         try {
-            const res = await axios.get('http://localhost:5000/api/journal', {
+            const res = await axios.get(`${API_BASE_URL}/api/journal`, {
                 headers: { Authorization: `Bearer ${token}` },
             });
             setEntries(res.data);
@@ -24,7 +26,7 @@ const JournalHistory = () => {
 
     const deleteEntry = async (id) => {
         try {
-            await axios.delete(`http://localhost:5000/api/journal/${id}`, {
+            await axios.delete(`${API_BASE_URL}/api/journal/${id}`, {
                 headers: { Authorization: `Bearer ${token}` },
             });
             setEntries((prev) => prev.filter((entry) => entry._id !== id));
