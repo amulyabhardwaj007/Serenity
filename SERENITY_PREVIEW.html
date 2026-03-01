@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Serenity - Mental Health App (Preview)</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        :root {
+            --primary: #2d6a4f;
+            --secondary: #95d5b2;
+            --accent: #d8f3dc;
+            --bg: #f8f9fa;
+            --text: #1b4332;
+            --white: #ffffff;
+            --pastel-blue: #caf0f8;
+            --pastel-pink: #fde2e4;
+            --pastel-yellow: #fff1e6;
+            --shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            --radius: 12px;
+        }
+
+        body {
+            font-family: sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 0;
+        }
+
+        .navbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 2rem;
+            background: var(--white);
+            box-shadow: var(--shadow);
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 2rem;
+            padding: 2rem;
+        }
+
+        .feature-card {
+            background: var(--white);
+            padding: 1.5rem;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            text-align: center;
+            cursor: pointer;
+            transition: transform 0.3s;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .card {
+            background: var(--white);
+            padding: 2rem;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            max-width: 400px;
+            margin: 2rem auto;
+        }
+
+        button {
+            background-color: var(--primary);
+            color: var(--white);
+            border: none;
+            padding: 0.8rem 1.5rem;
+            border-radius: var(--radius);
+            cursor: pointer;
+            width: 100%;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        function App() {
+            const [view, setView] = React.useState('dashboard');
+
+            const features = [
+                { title: 'Soothing Music', icon: '🎵', color: 'var(--pastel-blue)' },
+                { title: 'Personal Journal', icon: '✍️', color: 'var(--pastel-pink)' },
+                { title: 'Mini Games', icon: '🎮', color: 'var(--pastel-yellow)' },
+                { title: 'Relaxation Tips', icon: '💡', color: 'var(--accent)' },
+            ];
+
+            return (
+                <div>
+                    <nav className="navbar">
+                        <h2 onClick={() => setView('dashboard')} style={{ cursor: 'pointer' }}>Serenity</h2>
+                        <div style={{ display: 'flex', gap: '1rem' }}>
+                            <span>Dashboard</span>
+                            <span>Journal</span>
+                            <span>Music</span>
+                        </div>
+                    </nav>
+
+                    {view === 'dashboard' && (
+                        <div style={{ padding: '2rem' }}>
+                            <h1>Hello, Friend</h1>
+                            <p>How are you feeling today?</p>
+                            <div className="dashboard-grid">
+                                {features.map((f, i) => (
+                                    <div key={i} className="feature-card" style={{ backgroundColor: f.color }}>
+                                        <span style={{ fontSize: '3rem' }}>{f.icon}</span>
+                                        <h3>{f.title}</h3>
+                                        <p>Explore this section to relax and unwind.</p>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+
+</html>
