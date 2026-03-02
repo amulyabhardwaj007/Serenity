@@ -35,7 +35,7 @@ const Login = () => {
                 transition={{ duration: 0.45, ease: 'easeOut' }}
             >
                 <p className="eyebrow">Welcome back</p>
-                <h2>Welcome Back</h2>
+                <h2>Login</h2>
                 <p className="muted">Log in to continue your calm routine.</p>
                 {status.text && (
                     <p className={`notice ${status.type === 'error' ? 'notice-error' : 'notice-success'}`}>{status.text}</p>
