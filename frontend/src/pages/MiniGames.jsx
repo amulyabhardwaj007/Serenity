@@ -70,7 +70,7 @@ const MiniGames = () => {
 
     useEffect(() => {
         if (!room?.roomCode || tttMode !== 'online') return;
-        const id = setInterval(() => loadRoom(room.roomCode), 2000);
+        const id = setInterval(() => loadRoom(room.roomCode), 800);
         return () => clearInterval(id);
     }, [room?.roomCode, tttMode]);
 
@@ -102,6 +102,10 @@ const MiniGames = () => {
             setRoom(res.data);
             setStatusMessage('');
         } catch (err) {
+            const conflictRoom = err.response?.status === 409 ? err.response?.data?.room : null;
+            if (conflictRoom) {
+                setRoom(conflictRoom);
+            }
             setStatusMessage(err.response?.data?.message || 'Move failed');
         }
     };
@@ -202,23 +206,33 @@ const MiniGames = () => {
                 <div className="game-select-grid">
                     <motion.button
                         type="button"
-                        className="card game-card game-launch-card"
+                        className="card game-card game-launch-card ttt-launch"
                         onClick={() => setSelectedGame('ttt')}
-                        whileHover={{ y: -5 }}
-                        whileTap={{ scale: 0.99 }}
+                        whileHover={{ y: -8, scale: 1.01 }}
+                        whileTap={{ scale: 0.98 }}
                     >
+                        <div className="launch-meta">
+                            <span className="launch-emoji" aria-hidden="true">❌⭕</span>
+                            <span className="launch-pill">LIVE 1v1</span>
+                        </div>
                         <h3>Tic-Tac-Toe</h3>
                         <p>Online invite mode or play with yourself.</p>
+                        <span className="launch-hint">Tap to open</span>
                     </motion.button>
                     <motion.button
                         type="button"
-                        className="card game-card alt game-launch-card"
+                        className="card game-card alt game-launch-card memory-launch"
                         onClick={() => setSelectedGame('memory')}
-                        whileHover={{ y: -5 }}
-                        whileTap={{ scale: 0.99 }}
+                        whileHover={{ y: -8, scale: 1.01 }}
+                        whileTap={{ scale: 0.98 }}
                     >
+                        <div className="launch-meta">
+                            <span className="launch-emoji" aria-hidden="true">🧠✨</span>
+                            <span className="launch-pill">FOCUS MODE</span>
+                        </div>
                         <h3>Memory Match</h3>
                         <p>Match all pairs in the fewest moves.</p>
+                        <span className="launch-hint">Tap to open</span>
                     </motion.button>
                 </div>
             )}

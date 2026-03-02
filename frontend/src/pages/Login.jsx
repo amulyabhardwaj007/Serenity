@@ -8,15 +8,21 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 const Login = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [status, setStatus] = useState({ type: '', text: '' });
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     const handleLogin = async (e) => {
         e.preventDefault();
+        setIsSubmitting(true);
+        setStatus({ type: '', text: '' });
         try {
             const res = await axios.post(`${API_BASE_URL}/api/auth/login`, { email, password });
             localStorage.setItem('token', res.data.token);
             window.location.href = '/dashboard';
         } catch (err) {
-            alert('Login failed: ' + (err.response?.data?.message || 'Server error'));
+            setStatus({ type: 'error', text: err.response?.data?.message || 'Login failed. Please try again.' });
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -31,6 +37,9 @@ const Login = () => {
                 <p className="eyebrow">Welcome back</p>
                 <h2>Welcome Back</h2>
                 <p className="muted">Log in to continue your calm routine.</p>
+                {status.text && (
+                    <p className={`notice ${status.type === 'error' ? 'notice-error' : 'notice-success'}`}>{status.text}</p>
+                )}
                 <form onSubmit={handleLogin}>
                     <div className="input-group">
                         <label>Email</label>
@@ -40,7 +49,7 @@ const Login = () => {
                         <label>Password</label>
                         <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
                     </div>
-                    <button type="submit">Login</button>
+                    <button type="submit" disabled={isSubmitting}>{isSubmitting ? 'Logging in...' : 'Login'}</button>
                 </form>
                 <p className="auth-footnote">
                     Don't have an account? <Link to="/signup">Sign Up</Link>

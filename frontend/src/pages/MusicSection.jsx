@@ -20,29 +20,12 @@ const YouTubeIcon = () => (
 );
 
 const MusicSection = () => {
+    const MAX_PLAYLISTS = 3;
     const [spotifyInput, setSpotifyInput] = useState('');
     const [youtubeInput, setYoutubeInput] = useState('');
-    const [savedSpotify, setSavedSpotify] = useState('');
-    const [savedYoutube, setSavedYoutube] = useState('');
-
-    useEffect(() => {
-        const stored = localStorage.getItem('serenity_music_sources');
-        if (!stored) return;
-        try {
-            const parsed = JSON.parse(stored);
-            setSavedSpotify(parsed.spotify || '');
-            setSavedYoutube(parsed.youtube || '');
-        } catch (err) {
-            console.error(err);
-        }
-    }, []);
-
-    const saveSources = (nextSpotify, nextYoutube) => {
-        localStorage.setItem(
-            'serenity_music_sources',
-            JSON.stringify({ spotify: nextSpotify, youtube: nextYoutube }),
-        );
-    };
+    const [savedSpotify, setSavedSpotify] = useState([]);
+    const [savedYoutube, setSavedYoutube] = useState([]);
+    const [status, setStatus] = useState({ type: '', text: '' });
 
     const extractSpotifyPlaylistId = (value) => {
         if (!value) return '';
@@ -60,40 +43,127 @@ const MusicSection = () => {
         return urlMatch ? urlMatch[1] : '';
     };
 
-    const spotifyEmbed = useMemo(() => {
-        const id = extractSpotifyPlaylistId(savedSpotify);
-        if (!id) return '';
-        return `https://open.spotify.com/embed/playlist/${id}?utm_source=generator`;
-    }, [savedSpotify]);
+    const normalizeStoredList = (rawValue, extractor) => {
+        if (Array.isArray(rawValue)) {
+            return rawValue
+                .map((item) => String(item).trim())
+                .filter((item) => !!extractor(item))
+                .slice(0, MAX_PLAYLISTS);
+        }
+        if (typeof rawValue === 'string') {
+            const single = rawValue.trim();
+            return extractor(single) ? [single] : [];
+        }
+        return [];
+    };
 
-    const youtubeEmbed = useMemo(() => {
-        const id = extractYoutubePlaylistId(savedYoutube);
-        if (!id) return '';
-        return `https://www.youtube.com/embed/videoseries?list=${id}`;
-    }, [savedYoutube]);
+    useEffect(() => {
+        const stored = localStorage.getItem('serenity_music_sources');
+        if (!stored) return;
+        try {
+            const parsed = JSON.parse(stored);
+            setSavedSpotify(normalizeStoredList(parsed.spotify, extractSpotifyPlaylistId));
+            setSavedYoutube(normalizeStoredList(parsed.youtube, extractYoutubePlaylistId));
+        } catch (err) {
+            console.error(err);
+        }
+    }, []);
+
+    const saveSources = (nextSpotifyList, nextYoutubeList) => {
+        localStorage.setItem(
+            'serenity_music_sources',
+            JSON.stringify({ spotify: nextSpotifyList, youtube: nextYoutubeList }),
+        );
+    };
+
+    const spotifyEmbeds = useMemo(
+        () =>
+            savedSpotify
+                .map((url) => {
+                    const id = extractSpotifyPlaylistId(url);
+                    if (!id) return null;
+                    return {
+                        id,
+                        url,
+                        embedUrl: `https://open.spotify.com/embed/playlist/${id}?utm_source=generator`,
+                    };
+                })
+                .filter(Boolean),
+        [savedSpotify],
+    );
+
+    const youtubeEmbeds = useMemo(
+        () =>
+            savedYoutube
+                .map((url) => {
+                    const id = extractYoutubePlaylistId(url);
+                    if (!id) return null;
+                    return {
+                        id,
+                        url,
+                        embedUrl: `https://www.youtube.com/embed/videoseries?list=${id}`,
+                    };
+                })
+                .filter(Boolean),
+        [savedYoutube],
+    );
 
     const handleSaveSpotify = () => {
         const id = extractSpotifyPlaylistId(spotifyInput);
         if (!id) {
-            alert('Enter a valid Spotify playlist link.');
+            setStatus({ type: 'error', text: 'Enter a valid Spotify playlist link.' });
+            return;
+        }
+        if (savedSpotify.length >= MAX_PLAYLISTS) {
+            setStatus({ type: 'error', text: `You can save up to ${MAX_PLAYLISTS} Spotify playlists.` });
+            return;
+        }
+        if (savedSpotify.some((url) => extractSpotifyPlaylistId(url) === id)) {
+            setStatus({ type: 'error', text: 'This Spotify playlist is already saved.' });
             return;
         }
         const next = spotifyInput.trim();
-        setSavedSpotify(next);
-        saveSources(next, savedYoutube);
+        const nextSpotify = [...savedSpotify, next];
+        setSavedSpotify(nextSpotify);
+        saveSources(nextSpotify, savedYoutube);
         setSpotifyInput('');
+        setStatus({ type: 'success', text: 'Spotify playlist saved.' });
     };
 
     const handleSaveYoutube = () => {
         const id = extractYoutubePlaylistId(youtubeInput);
         if (!id) {
-            alert('Enter a valid YouTube or YouTube Music playlist link.');
+            setStatus({ type: 'error', text: 'Enter a valid YouTube or YouTube Music playlist link.' });
+            return;
+        }
+        if (savedYoutube.length >= MAX_PLAYLISTS) {
+            setStatus({ type: 'error', text: `You can save up to ${MAX_PLAYLISTS} YouTube playlists.` });
+            return;
+        }
+        if (savedYoutube.some((url) => extractYoutubePlaylistId(url) === id)) {
+            setStatus({ type: 'error', text: 'This YouTube playlist is already saved.' });
             return;
         }
         const next = youtubeInput.trim();
-        setSavedYoutube(next);
-        saveSources(savedSpotify, next);
+        const nextYoutube = [...savedYoutube, next];
+        setSavedYoutube(nextYoutube);
+        saveSources(savedSpotify, nextYoutube);
         setYoutubeInput('');
+        setStatus({ type: 'success', text: 'YouTube playlist saved.' });
+    };
+
+    const removeSpotifyPlaylist = (id) => {
+        const nextSpotify = savedSpotify.filter((url) => extractSpotifyPlaylistId(url) !== id);
+        setSavedSpotify(nextSpotify);
+        saveSources(nextSpotify, savedYoutube);
+        setStatus({ type: 'success', text: 'Spotify playlist removed.' });
+    };
+
+    const removeYoutubePlaylist = (id) => {
+        const nextYoutube = savedYoutube.filter((url) => extractYoutubePlaylistId(url) !== id);
+        setSavedYoutube(nextYoutube);
+        saveSources(savedSpotify, nextYoutube);
+        setStatus({ type: 'success', text: 'YouTube playlist removed.' });
     };
 
     const tracks = [
@@ -164,7 +234,10 @@ const MusicSection = () => {
                 transition={{ duration: 0.28, delay: 0.1 }}
             >
                 <h3>Your Playlists</h3>
-                <p className="muted">Paste your playlist URLs and play them here.</p>
+                <p className="muted">Save up to 3 playlists per platform. Remove any time.</p>
+                {status.text && (
+                    <p className={`notice ${status.type === 'error' ? 'notice-error' : 'notice-success'}`}>{status.text}</p>
+                )}
 
                 <div className="playlist-grid">
                     <div className="playlist-source">
@@ -178,17 +251,32 @@ const MusicSection = () => {
                                 onChange={(e) => setSpotifyInput(e.target.value)}
                                 placeholder="https://open.spotify.com/playlist/..."
                             />
-                            <button type="button" onClick={handleSaveSpotify}>Save</button>
+                            <button type="button" onClick={handleSaveSpotify} disabled={savedSpotify.length >= MAX_PLAYLISTS}>Save</button>
                         </div>
-                        {spotifyEmbed ? (
-                            <div className="spotify-frame">
-                                <iframe
-                                    title="Your Spotify Playlist"
-                                    src={spotifyEmbed}
-                                    loading="lazy"
-                                    allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-                                />
-                            </div>
+                        <p className="muted">Saved: {savedSpotify.length}/{MAX_PLAYLISTS}</p>
+                        {spotifyEmbeds.length ? (
+                            spotifyEmbeds.map((playlist, index) => (
+                                <div key={`${playlist.id}-${index}`} className="stack">
+                                    <div className="entry-footer">
+                                        <span>Playlist {index + 1}</span>
+                                        <button
+                                            type="button"
+                                            className="delete-button"
+                                            onClick={() => removeSpotifyPlaylist(playlist.id)}
+                                        >
+                                            Remove
+                                        </button>
+                                    </div>
+                                    <div className="spotify-frame">
+                                        <iframe
+                                            title={`Spotify Playlist ${index + 1}`}
+                                            src={playlist.embedUrl}
+                                            loading="lazy"
+                                            allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+                                        />
+                                    </div>
+                                </div>
+                            ))
                         ) : (
                             <p className="muted">Add a public Spotify playlist to load it.</p>
                         )}
@@ -205,18 +293,33 @@ const MusicSection = () => {
                                 onChange={(e) => setYoutubeInput(e.target.value)}
                                 placeholder="https://music.youtube.com/playlist?list=..."
                             />
-                            <button type="button" onClick={handleSaveYoutube}>Save</button>
+                            <button type="button" onClick={handleSaveYoutube} disabled={savedYoutube.length >= MAX_PLAYLISTS}>Save</button>
                         </div>
-                        {youtubeEmbed ? (
-                            <div className="video-frame">
-                                <iframe
-                                    title="Your YouTube Playlist"
-                                    src={youtubeEmbed}
-                                    loading="lazy"
-                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                    allowFullScreen
-                                />
-                            </div>
+                        <p className="muted">Saved: {savedYoutube.length}/{MAX_PLAYLISTS}</p>
+                        {youtubeEmbeds.length ? (
+                            youtubeEmbeds.map((playlist, index) => (
+                                <div key={`${playlist.id}-${index}`} className="stack">
+                                    <div className="entry-footer">
+                                        <span>Playlist {index + 1}</span>
+                                        <button
+                                            type="button"
+                                            className="delete-button"
+                                            onClick={() => removeYoutubePlaylist(playlist.id)}
+                                        >
+                                            Remove
+                                        </button>
+                                    </div>
+                                    <div className="video-frame">
+                                        <iframe
+                                            title={`YouTube Playlist ${index + 1}`}
+                                            src={playlist.embedUrl}
+                                            loading="lazy"
+                                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                            allowFullScreen
+                                        />
+                                    </div>
+                                </div>
+                            ))
                         ) : (
                             <p className="muted">Add a public YouTube playlist to load it.</p>
                         )}

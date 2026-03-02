@@ -1,14 +1,21 @@
 const jwt = require('jsonwebtoken');
 
 module.exports = function (req, res, next) {
-    const token = req.header('Authorization');
-    if (!token) return res.status(401).json({ message: 'Access denied. No token provided.' });
+    const authHeader = req.header('Authorization') || '';
+    const [scheme, token] = authHeader.split(' ');
+
+    if (scheme !== 'Bearer' || !token) {
+        return res.status(401).json({ message: 'Access denied. Bearer token required.' });
+    }
 
     try {
-        const decoded = jwt.verify(token.split(' ')[1], process.env.JWT_SECRET);
-        req.user = decoded;
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        req.user = { id: decoded.id };
         next();
-    } catch (ex) {
-        res.status(400).json({ message: 'Invalid token.' });
+    } catch (error) {
+        if (error.name === 'TokenExpiredError') {
+            return res.status(401).json({ message: 'Token expired.' });
+        }
+        return res.status(401).json({ message: 'Invalid token.' });
     }
 };

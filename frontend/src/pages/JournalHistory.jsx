@@ -4,24 +4,40 @@ import { Link } from 'react-router-dom';
 import axios from 'axios';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const PAGE_LIMIT = 10;
 
 const JournalHistory = () => {
     const [entries, setEntries] = useState([]);
+    const [page, setPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const [totalEntries, setTotalEntries] = useState(0);
+    const [loading, setLoading] = useState(false);
+    const [statusMessage, setStatusMessage] = useState('');
     const token = localStorage.getItem('token');
 
-    const fetchEntries = async () => {
+    const fetchEntries = async (targetPage = 1) => {
+        setLoading(true);
         try {
             const res = await axios.get(`${API_BASE_URL}/api/journal`, {
+                params: { page: targetPage, limit: PAGE_LIMIT },
                 headers: { Authorization: `Bearer ${token}` },
             });
-            setEntries(res.data);
+
+            const payload = res.data;
+            setEntries(payload.entries || []);
+            setPage(payload.page || targetPage);
+            setTotalPages(payload.totalPages || 1);
+            setTotalEntries(payload.totalEntries || 0);
+            setStatusMessage('');
         } catch (err) {
-            alert('Failed to load entries');
+            setStatusMessage('Failed to load entries');
+        } finally {
+            setLoading(false);
         }
     };
 
     useEffect(() => {
-        fetchEntries();
+        fetchEntries(1);
     }, []);
 
     const deleteEntry = async (id) => {
@@ -29,9 +45,12 @@ const JournalHistory = () => {
             await axios.delete(`${API_BASE_URL}/api/journal/${id}`, {
                 headers: { Authorization: `Bearer ${token}` },
             });
-            setEntries((prev) => prev.filter((entry) => entry._id !== id));
+            const remainingOnPage = entries.length - 1;
+            const targetPage = remainingOnPage === 0 && page > 1 ? page - 1 : page;
+            await fetchEntries(targetPage);
+            setStatusMessage('');
         } catch (err) {
-            alert(err.response?.data?.message || 'Failed to delete entry');
+            setStatusMessage(err.response?.data?.message || 'Failed to delete entry');
         }
     };
 
@@ -41,9 +60,12 @@ const JournalHistory = () => {
                 <p className="eyebrow">Journal history</p>
                 <h2>Previous Entries</h2>
                 <p className="muted">You can review and delete old entries here.</p>
+                {statusMessage && <p className="notice notice-error">{statusMessage}</p>}
             </div>
 
             <div className="stack">
+                <p className="muted">Total entries: {totalEntries}</p>
+                {loading && <p className="muted">Loading...</p>}
                 {entries.length === 0 && <p className="muted">No entries yet.</p>}
                 {entries.map((entry, index) => (
                     <motion.div
@@ -67,6 +89,16 @@ const JournalHistory = () => {
                         </div>
                     </motion.div>
                 ))}
+            </div>
+
+            <div className="game-actions">
+                <button type="button" onClick={() => fetchEntries(page - 1)} disabled={page <= 1 || loading}>
+                    Previous
+                </button>
+                <span className="muted">Page {page} of {totalPages}</span>
+                <button type="button" onClick={() => fetchEntries(page + 1)} disabled={page >= totalPages || loading}>
+                    Next
+                </button>
             </div>
 
             <Link to="/journal" className="view-history-button back-link">

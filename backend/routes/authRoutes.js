@@ -3,9 +3,10 @@ const router = express.Router();
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
+const { validateSignup, validateLogin } = require('../middleware/requestValidation');
 
 // Register User
-router.post('/signup', async (req, res) => {
+router.post('/signup', validateSignup, async (req, res, next) => {
     try {
         const { username, email, password } = req.body;
         let user = await User.findOne({ email });
@@ -15,14 +16,14 @@ router.post('/signup', async (req, res) => {
         await user.save();
 
         const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '1d' });
-        res.status(201).json({ token, user: { id: user._id, username, email } });
+        return res.status(201).json({ token, user: { id: user._id, username, email } });
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        return next(error);
     }
 });
 
 // Login User
-router.post('/login', async (req, res) => {
+router.post('/login', validateLogin, async (req, res, next) => {
     try {
         const { email, password } = req.body;
         const user = await User.findOne({ email });
@@ -32,9 +33,9 @@ router.post('/login', async (req, res) => {
         if (!isMatch) return res.status(400).json({ message: 'Invalid credentials' });
 
         const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '1d' });
-        res.json({ token, user: { id: user._id, username: user.username, email } });
+        return res.json({ token, user: { id: user._id, username: user.username, email } });
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        return next(error);
     }
 });
 

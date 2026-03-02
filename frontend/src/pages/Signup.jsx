@@ -9,15 +9,21 @@ const Signup = () => {
     const [username, setUsername] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [status, setStatus] = useState({ type: '', text: '' });
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     const handleSignup = async (e) => {
         e.preventDefault();
+        setIsSubmitting(true);
+        setStatus({ type: '', text: '' });
         try {
             const res = await axios.post(`${API_BASE_URL}/api/auth/signup`, { username, email, password });
             localStorage.setItem('token', res.data.token);
             window.location.href = '/dashboard';
         } catch (err) {
-            alert('Signup failed: ' + (err.response?.data?.message || 'Server error'));
+            setStatus({ type: 'error', text: err.response?.data?.message || 'Signup failed. Please try again.' });
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -32,6 +38,9 @@ const Signup = () => {
                 <p className="eyebrow">Start fresh</p>
                 <h2>Create Account</h2>
                 <p className="muted">Build your private space for journaling and calm tools.</p>
+                {status.text && (
+                    <p className={`notice ${status.type === 'error' ? 'notice-error' : 'notice-success'}`}>{status.text}</p>
+                )}
                 <form onSubmit={handleSignup}>
                     <div className="input-group">
                         <label>Username</label>
@@ -45,7 +54,7 @@ const Signup = () => {
                         <label>Password</label>
                         <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
                     </div>
-                    <button type="submit">Sign Up</button>
+                    <button type="submit" disabled={isSubmitting}>{isSubmitting ? 'Creating account...' : 'Sign Up'}</button>
                 </form>
                 <p className="auth-footnote">
                     Already have an account? <Link to="/login">Login</Link>

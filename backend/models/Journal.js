@@ -8,4 +8,6 @@ const JournalSchema = new mongoose.Schema({
     createdAt: { type: Date, default: Date.now }
 });
 
+JournalSchema.index({ userId: 1, createdAt: -1 });
+
 module.exports = mongoose.model('Journal', JournalSchema);

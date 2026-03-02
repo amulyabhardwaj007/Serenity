@@ -1,7 +1,9 @@
 const express = require('express');
 const router = express.Router();
+const mongoose = require('mongoose');
 const GameRoom = require('../models/GameRoom');
 const auth = require('../middleware/auth');
+const { validateRoomCodeParam, validateGameMove } = require('../middleware/requestValidation');
 
 const generateRoomCode = () => Math.random().toString(36).slice(2, 8).toUpperCase();
 
@@ -35,7 +37,15 @@ const buildPayload = (room, userId) => {
     };
 };
 
-router.post('/rooms', auth, async (req, res) => {
+const parseObjectId = (value) => {
+    try {
+        return new mongoose.Types.ObjectId(value);
+    } catch (error) {
+        return null;
+    }
+};
+
+router.post('/rooms', auth, async (req, res, next) => {
     try {
         let code = generateRoomCode();
         while (await GameRoom.exists({ roomCode: code })) {
@@ -49,69 +59,106 @@ router.post('/rooms', auth, async (req, res) => {
             status: 'waiting',
         });
 
-        res.status(201).json(buildPayload(room, req.user.id));
+        return res.status(201).json(buildPayload(room, req.user.id));
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        return next(error);
     }
 });
 
-router.get('/rooms/:roomCode', auth, async (req, res) => {
+router.get('/rooms/:roomCode', auth, validateRoomCodeParam, async (req, res, next) => {
     try {
-        const room = await GameRoom.findOne({ roomCode: req.params.roomCode.toUpperCase() });
+        let room = await GameRoom.findOne({ roomCode: req.params.roomCode });
         if (!room) return res.status(404).json({ message: 'Room not found' });
 
         const alreadyJoined = room.players.some(
             (player) => player.userId.toString() === req.user.id.toString(),
         );
 
-        if (!alreadyJoined && room.players.length < 2) {
-            room.players.push({ userId: req.user.id, symbol: 'O' });
-            if (room.status === 'waiting') room.status = 'active';
-            await room.save();
+        if (!alreadyJoined) {
+            const userId = parseObjectId(req.user.id);
+            if (!userId) return res.status(400).json({ message: 'Invalid user id.' });
+
+            const joinedRoom = await GameRoom.findOneAndUpdate(
+                {
+                    roomCode: req.params.roomCode,
+                    players: { $not: { $elemMatch: { userId } } },
+                    'players.1': { $exists: false },
+                },
+                {
+                    $push: { players: { userId, symbol: 'O' } },
+                    $set: { status: 'active' },
+                },
+                { new: true },
+            );
+
+            room = joinedRoom || await GameRoom.findOne({ roomCode: req.params.roomCode });
         }
 
-        res.json(buildPayload(room, req.user.id));
+        return res.json(buildPayload(room, req.user.id));
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        return next(error);
     }
 });
 
-router.post('/rooms/:roomCode/move', auth, async (req, res) => {
+router.post('/rooms/:roomCode/move', auth, validateRoomCodeParam, validateGameMove, async (req, res, next) => {
     try {
-        const room = await GameRoom.findOne({ roomCode: req.params.roomCode.toUpperCase() });
+        const room = await GameRoom.findOne({ roomCode: req.params.roomCode });
         if (!room) return res.status(404).json({ message: 'Room not found' });
         if (room.status !== 'active') return res.status(400).json({ message: 'Game is not active yet.' });
+        if (room.winner) return res.status(400).json({ message: 'Game is already finished.' });
 
         const me = room.players.find((player) => player.userId.toString() === req.user.id.toString());
         if (!me) return res.status(403).json({ message: 'Join this room first.' });
-        if (room.winner) return res.status(400).json({ message: 'Game is already finished.' });
         if (me.symbol !== room.currentPlayer) return res.status(400).json({ message: 'Not your turn.' });
 
-        const index = Number(req.body.index);
-        if (!Number.isInteger(index) || index < 0 || index > 8) {
-            return res.status(400).json({ message: 'Invalid move index.' });
-        }
+        const index = req.body.index;
         if (room.board[index]) return res.status(400).json({ message: 'Cell already filled.' });
 
-        room.board[index] = me.symbol;
-        const result = getWinner(room.board);
+        const nextBoard = [...room.board];
+        nextBoard[index] = me.symbol;
+        const result = getWinner(nextBoard);
+        const update = {
+            $set: {
+                [`board.${index}`]: me.symbol,
+            },
+        };
+
         if (result) {
-            room.winner = result;
-            room.status = 'finished';
+            update.$set.winner = result;
+            update.$set.status = 'finished';
         } else {
-            room.currentPlayer = room.currentPlayer === 'X' ? 'O' : 'X';
+            update.$set.currentPlayer = room.currentPlayer === 'X' ? 'O' : 'X';
         }
 
-        await room.save();
-        res.json(buildPayload(room, req.user.id));
+        const updatedRoom = await GameRoom.findOneAndUpdate(
+            {
+                _id: room._id,
+                status: 'active',
+                winner: '',
+                currentPlayer: me.symbol,
+                [`board.${index}`]: '',
+            },
+            update,
+            { new: true },
+        );
+
+        if (!updatedRoom) {
+            const latestRoom = await GameRoom.findById(room._id);
+            return res.status(409).json({
+                message: 'Move conflict detected. Please retry.',
+                room: latestRoom ? buildPayload(latestRoom, req.user.id) : null,
+            });
+        }
+
+        return res.json(buildPayload(updatedRoom, req.user.id));
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        return next(error);
     }
 });
 
-router.post('/rooms/:roomCode/reset', auth, async (req, res) => {
+router.post('/rooms/:roomCode/reset', auth, validateRoomCodeParam, async (req, res, next) => {
     try {
-        const room = await GameRoom.findOne({ roomCode: req.params.roomCode.toUpperCase() });
+        const room = await GameRoom.findOne({ roomCode: req.params.roomCode });
         if (!room) return res.status(404).json({ message: 'Room not found' });
 
         const me = room.players.find((player) => player.userId.toString() === req.user.id.toString());
@@ -123,9 +170,9 @@ router.post('/rooms/:roomCode/reset', auth, async (req, res) => {
         room.status = room.players.length < 2 ? 'waiting' : 'active';
         await room.save();
 
-        res.json(buildPayload(room, req.user.id));
+        return res.json(buildPayload(room, req.user.id));
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        return next(error);
     }
 });
 

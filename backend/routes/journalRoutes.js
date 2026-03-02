@@ -2,10 +2,15 @@ const express = require('express');
 const router = express.Router();
 const Journal = require('../models/Journal');
 const auth = require('../middleware/auth');
+const { validateJournalCreate } = require('../middleware/requestValidation');
+
 const ENTRY_LIMIT = Number(process.env.JOURNAL_ENTRY_LIMIT || 200);
+const DEFAULT_PAGE = 1;
+const DEFAULT_LIMIT = 10;
+const MAX_LIMIT = 50;
 
 // Create Journal Entry
-router.post('/', auth, async (req, res) => {
+router.post('/', auth, validateJournalCreate, async (req, res, next) => {
     try {
         const { title, content, mood } = req.body;
         const entryCount = await Journal.countDocuments({ userId: req.user.id });
@@ -17,35 +22,54 @@ router.post('/', auth, async (req, res) => {
             userId: req.user.id,
             title,
             content,
-            mood
+            mood,
         });
         const savedEntry = await newEntry.save();
-        res.status(201).json(savedEntry);
+        return res.status(201).json(savedEntry);
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        return next(error);
     }
 });
 
-// Get All User Entries
-router.get('/', auth, async (req, res) => {
+// Get User Entries (paginated)
+router.get('/', auth, async (req, res, next) => {
     try {
-        const entries = await Journal.find({ userId: req.user.id }).sort({ createdAt: -1 });
-        res.json(entries);
+        const page = Math.max(Number.parseInt(req.query.page, 10) || DEFAULT_PAGE, 1);
+        const requestedLimit = Number.parseInt(req.query.limit, 10) || DEFAULT_LIMIT;
+        const limit = Math.min(Math.max(requestedLimit, 1), MAX_LIMIT);
+        const skip = (page - 1) * limit;
+
+        const [entries, totalEntries] = await Promise.all([
+            Journal.find({ userId: req.user.id }).sort({ createdAt: -1 }).skip(skip).limit(limit),
+            Journal.countDocuments({ userId: req.user.id }),
+        ]);
+
+        const totalPages = Math.max(Math.ceil(totalEntries / limit), 1);
+
+        return res.json({
+            entries,
+            page,
+            limit,
+            totalEntries,
+            totalPages,
+            hasNextPage: page < totalPages,
+            hasPrevPage: page > 1,
+        });
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        return next(error);
     }
 });
 
 // Delete User Entry
-router.delete('/:id', auth, async (req, res) => {
+router.delete('/:id', auth, async (req, res, next) => {
     try {
         const deleted = await Journal.findOneAndDelete({ _id: req.params.id, userId: req.user.id });
         if (!deleted) {
             return res.status(404).json({ message: 'Entry not found' });
         }
-        res.json({ message: 'Entry deleted successfully' });
+        return res.json({ message: 'Entry deleted successfully' });
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        return next(error);
     }
 });
 

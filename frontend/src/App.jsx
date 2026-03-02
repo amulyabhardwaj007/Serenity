@@ -1,6 +1,7 @@
 import React from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { BrowserRouter as Router, Routes, Route, NavLink, Navigate, useLocation } from 'react-router-dom';
+import Landing from './pages/Landing';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import Dashboard from './pages/Dashboard';
@@ -52,8 +53,9 @@ const AppShell = () => {
                     transition={{ duration: 0.38, ease: 'easeOut' }}
                 >
                     <Routes location={location}>
-                        <Route path="/login" element={<Login />} />
-                        <Route path="/signup" element={<Signup />} />
+                        <Route path="/" element={<Landing isAuth={isAuth} />} />
+                        <Route path="/login" element={isAuth ? <Navigate to="/dashboard" /> : <Login />} />
+                        <Route path="/signup" element={isAuth ? <Navigate to="/dashboard" /> : <Signup />} />
                         <Route path="/dashboard" element={isAuth ? <Dashboard /> : <Navigate to="/login" />} />
                         <Route path="/journal" element={isAuth ? <JournalSection /> : <Navigate to="/login" />} />
                         <Route path="/journal/history" element={isAuth ? <JournalHistory /> : <Navigate to="/login" />} />
@@ -62,7 +64,7 @@ const AppShell = () => {
                         <Route path="/yoga" element={isAuth ? <YogaPoses /> : <Navigate to="/login" />} />
                         <Route path="/tips" element={isAuth ? <RelaxationTips /> : <Navigate to="/login" />} />
                         <Route path="/games" element={isAuth ? <MiniGames /> : <Navigate to="/login" />} />
-                        <Route path="/" element={<Navigate to={isAuth ? '/dashboard' : '/login'} />} />
+                        <Route path="*" element={<Navigate to="/" />} />
                     </Routes>
                 </motion.main>
             </AnimatePresence>
